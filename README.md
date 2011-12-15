@@ -1,4 +1,4 @@
-# resourceful
+# resourceful [![Build Status](https://secure.travis-ci.org/flatiron/resourceful.png)](http://travis-ci.org/flatiron/resourceful)
 
 A storage agnostic resource-oriented ODM for building prototypical models with validation and sanitization.
 
@@ -16,9 +16,9 @@ A storage agnostic resource-oriented ODM for building prototypical models with v
     //
     // Specify some properties with validation
     //
-    this.property('diet'); // Defaults to String
-    this.property('vertebrate', Boolean);
-    this.property('belly', Array);
+    this.string('diet');
+    this.bool('vertebrate');
+    this.array('belly');
   });
   
   //
@@ -49,6 +49,11 @@ Here's the simplest of resources:
 The returned `Creature` object is a *resource constructor*, in other words, a *function*. Now let's add some properties to this constructor:
 
 ``` js
+  Creature.string('diet');
+  Creature.bool('vertebrate');
+  Creature.array('belly');
+
+  // Are equivalent to
   Creature.property('diet'); // Defaults to String
   Creature.property('vertebrate', Boolean);
   Creature.property('belly', Array);
@@ -66,7 +71,7 @@ Now lets instantiate a Creature, and feed it:
 
 ``` js
   var wolf = new(Creature)({
-    diet:      'carnivor',
+    diet:      'carnivore',
     vertebrate: true
   });
   
@@ -78,9 +83,9 @@ You can also define resources this way:
 
 ``` js
   var Creature = resourceful.define('creature', function () {
-    this.property('diet');
-    this.property('vertebrate', Boolean);
-    this.property('belly', Array);
+    this.string('diet');
+    this.bool('vertebrate');
+    this.array('belly');
 
     this.prototype.feed = function (food) {
       this.belly.push(food);
@@ -93,19 +98,21 @@ You can also define resources this way:
 Lets define a *legs* property, which is the number of legs the creature has:
 
 ``` js
-  Creature.property('legs', Number);
+  Creature.number('legs');
 ```
 
 Note that this form is equivalent:
 
 ``` js
+  Creature.property('legs', Number);
+  /* or */
   Creature.property('legs', 'number');
 ```
 
 If we wanted to constrain the possible values the property could take, we could pass in an object as the last parameter:
 
 ``` js
-  Creature.property('legs', Number, {
+  Creature.number('legs', {
     required: true,
 
     minimum: 0,
@@ -122,7 +129,7 @@ Now resourceful won't let `Creature` instances be saved unless the *legs* proper
 This style is also valid for defining properties:
 
 ``` js
-  Creature.property('legs', Number)
+  Creature.number('legs')
           .required()
           .minimum(0)
           .maximum(8)
@@ -134,6 +141,46 @@ If you want to access and modify an already defined property, you can do it this
 ``` js
     Creature.properties['legs'].maximum(6);
 ```
+### Mixing in Properties
+
+As a form of inheritance, you can mixin the properties of one or more Resources into another.
+
+``` js
+  var Invertebrate = resourceful.define('Invertebrate', function () {
+    this.bool("vertebrate", {default: false});
+  };
+
+  var Insect = resourceful.define('Insect', function () {
+    this.mixin(Creature, Invertebrate);
+    this.number('legs').minimum(6).maximum(6).default(6);
+  };
+```
+OR
+``` js
+  var Invertebrate = resourceful.define('Invertebrate', function () {
+    this.mixin(Creature);
+    this.bool("vertebrate", {default: false});
+  });
+
+  var Insect = resourceful.define('Insect', function () {
+    this.mixin(Insect);
+    this.number('legs').minimum(6).maximum(6).default(6);
+  });
+```
+
+``` js
+  var ladybug = new(Invertebrate)({
+    diet:      'aphids'
+  });
+
+  > ladybug.legs
+    => 6
+  > ladybug.vertebrate
+    => false
+```
+
+Note: #mixin() performs a static copy of properties from the provided Resource(s). This protects the 'parent' resource, but also means you typically should only mixin a Resource once it is completely defined.
+
 
 ### Saving and fetching resources
 
