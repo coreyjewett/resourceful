@@ -359,6 +359,17 @@ vows.describe('resourceful').addVows({
       },
       "should be type:'number'": function (r) {
         assert.equal(r.properties.rank.type, "number");
+      },
+      "default": {
+        topic: function () {
+          var r = resourceful.define();
+          r.number('rank', { minimum: 1, default: 5 });
+          return r;
+        },
+        "should have": function (r) {
+          assert.equal(r.properties.rank.default, 5);
+          assert.equal(new(r)().rank, 5);
+        }
       }
     },
     "with `bool()`": {
@@ -457,6 +468,115 @@ vows.describe('resourceful').addVows({
         assert.equal(r.properties.title.maxLength, 16);
         assert.equal(r.properties.title.minLength, 0);
       }
+    }
+  }
+}).addVows({ // Mixins
+  "mixin()": {
+    topic: function () {
+      var mA = resourceful.define("mixinA");
+      mA.string("propA");
+      mA.number("propB");
+      var mB = resourceful.define("mixinB");
+      mB.string("propC")
+          .maxLength(16)
+          .minLength(0);
+      mB.number("propD");
+      var mC = resourceful.define("mixinC");
+      mC.bool("propA");   // collision.
+      mC.number("propE");
+      return [mA, mB, mC];
+    },
+    "does basic composition": function (mixins) {
+      var r = resourceful.define("shaken");
+      r.string("propZ");
+      r.mixin(mixins[0]);
+      r.mixin(mixins[1]);
+
+      // assert.equal(Object.keys(r.properties).length, 6);
+      assert.equal(r.properties.propZ.type, "string");
+      assert.equal(r.properties.propA.type, "string");
+      assert.equal(r.properties.propB.type, "number");
+      assert.equal(r.properties.propC.type, "string");
+      assert.equal(r.properties.propC.maxLength, 16);
+      assert.equal(r.properties.propC.minLength, 0);
+      assert.equal(r.properties.propD.type, "number");
+      assert.equal(r.properties.propA.maxLength, undefined);
+    },
+    "last property overwrites in the event of collision": function (mixins) {
+      var r = resourceful.define("stirred");
+      r.array("propA");
+      assert.equal(Object.keys(r.properties).length, 2);    // includes _id
+      assert.equal(r.properties.propA.type, "array");
+
+      r.mixin(mixins[0]);
+      assert.equal(Object.keys(r.properties).length, 3);
+      assert.equal(r.properties.propA.type, "string");
+
+      r.mixin(mixins[2]);
+      assert.equal(Object.keys(r.properties).length, 4);
+      assert.equal(r.properties.propA.type, "boolean");
+      assert.equal(r.properties.propB.type, "number");
+      assert.equal(r.properties.propE.type, "number");
+    },
+    "accepts String resource name as mixin": function(mixins) {
+      var r = resourceful.define("blended");
+      r.array("propA");
+      assert.equal(Object.keys(r.properties).length, 2);
+      assert.equal(r.properties.propA.type, "array");
+
+      r.mixin(mixins[0]);
+      assert.equal(Object.keys(r.properties).length, 3);
+      assert.equal(r.properties.propA.type, "string");
+    },
+    "accepts multiple arguments": function(mixins) {
+      var r = resourceful.define("blended");
+      r.mixin.apply(r, mixins);
+      assert.equal(Object.keys(r.properties).length, 6);
+    },
+    "properties": {
+      "have validation methods": function(mixins) {
+        var r = resourceful.define("emulsified");
+        r.number("propZ").maximum = 8;
+        r.properties["propZ"].maximum = 12;
+        assert.equal(r.properties.propZ.type, "number");
+        assert.equal(r.properties.propZ.maximum, 12);
+
+        r.mixin("mixinA");
+        r.properties['propB'].maximum = 6;
+        assert.equal(r.properties.propB.type, "number");
+        assert.equal(r.properties.propB.maximum, 6);
+      },
+      "are copied not references": function(mixins) {
+        var r = resourceful.define("emulsified");
+        r.mixin(mixins[0]);
+        r.properties['propB'].maximum = 6 ;
+        assert.equal(r.properties.propB.maximum, 6);
+        assert.equal(mixins[0].properties.propB.maximum, undefined);
+      }
+    },
+    "summary": function() {
+      var Creature = resourceful.define('creature', function () {
+         this.string('diet');
+         this.bool('vertebrate');
+         this.array('belly');
+       });
+
+      var Invertebrate = resourceful.define('Invertebrate', function () {
+        this.mixin(Creature);
+        this.bool("vertebrate", {default: false});
+      });
+
+      var Insect = resourceful.define('Insect', function () {
+        this.mixin(Invertebrate);
+        this.number('legs').minimum(6).maximum(6).default(6);
+      });
+
+      var ladybug = new(Insect)({
+        diet:      'aphids'
+      });
+
+      assert.equal(ladybug.legs, 6);
+      assert.equal(ladybug.vertebrate, false);
     }
   }
 }).addVows({ // CRUD

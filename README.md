@@ -71,7 +71,7 @@ Now lets instantiate a Creature, and feed it:
 
 ``` js
   var wolf = new(Creature)({
-    diet:      'carnivor',
+    diet:      'carnivore',
     vertebrate: true
   });
   
@@ -141,6 +141,46 @@ If you want to access and modify an already defined property, you can do it this
 ``` js
     Creature.properties['legs'].maximum(6);
 ```
+### Mixing in Properties
+
+As a form of inheritance, you can mixin the properties of one or more Resources into another.
+
+``` js
+  var Invertebrate = resourceful.define('Invertebrate', function () {
+    this.bool("vertebrate", {default: false});
+  };
+
+  var Insect = resourceful.define('Insect', function () {
+    this.mixin(Creature, Invertebrate);
+    this.number('legs').minimum(6).maximum(6).default(6);
+  };
+```
+OR
+``` js
+  var Invertebrate = resourceful.define('Invertebrate', function () {
+    this.mixin(Creature);
+    this.bool("vertebrate", {default: false});
+  });
+
+  var Insect = resourceful.define('Insect', function () {
+    this.mixin(Insect);
+    this.number('legs').minimum(6).maximum(6).default(6);
+  });
+```
+
+``` js
+  var ladybug = new(Invertebrate)({
+    diet:      'aphids'
+  });
+
+  > ladybug.legs
+    => 6
+  > ladybug.vertebrate
+    => false
+```
+
+Note: #mixin() performs a static copy of properties from the provided Resource(s). This protects the 'parent' resource, but also means you typically should only mixin a Resource once it is completely defined.
+
 
 ### Saving and fetching resources
 
