@@ -19,6 +19,7 @@ vows.describe('resourceful').addVows({
       "and has the create/get/all/find methods": function (Factory) {
         assert.isFunction(Factory.create);
         assert.isFunction(Factory.destroy);
+        assert.isFunction(Factory.truncate);
         assert.isFunction(Factory.get);
         assert.isFunction(Factory.all);
         assert.isFunction(Factory.find);
