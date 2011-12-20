@@ -163,13 +163,13 @@ OR
   });
 
   var Insect = resourceful.define('Insect', function () {
-    this.mixin(Insect);
+    this.mixin(Invertebrate);
     this.number('legs').minimum(6).maximum(6).default(6);
   });
 ```
 
 ``` js
-  var ladybug = new(Invertebrate)({
+  var ladybug = new(Insect)({
     diet:      'aphids'
   });
 
