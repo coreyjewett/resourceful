@@ -130,6 +130,8 @@ Resource._request = function (/* method, [key, obj], callback */) {
         } else {
           if (method === 'destroy') {
             that.connection.cache.clear(key);
+          } else if (method === 'truncate') {
+            that.connection.cache.clear();
           } else {
             if (result.rev) {
               // Set the revision if available, so it can be saved
@@ -251,6 +253,15 @@ Resource.destroy = function (id, callback) {
     : callback && callback(new Error('key is undefined'));
 };
 
+<<<<<<< HEAD
+Resource.truncate = function (callback) {
+  return this._request("truncate", callback);
+};
+
+Resource.update = function (key, obj, callback) {
+  if (this._timestamps) obj.mtime = Date.now();
+  return this._request("update", key, obj, callback);
+=======
 Resource.update = function (id, obj, callback) {
   if (this.schema.properties._id && this.schema.properties._id.sanitize) {
     id = this.schema.properties._id.sanitize(id);
@@ -263,6 +274,7 @@ Resource.update = function (id, obj, callback) {
   return id 
     ? this._request('update', id, obj, callback)
     : callback && callback(new Error('key is undefined'));
+>>>>>>> upstream/master
 };
 
 Resource.all = function (callback) {
@@ -504,6 +516,10 @@ Resource.object = function (name, schema) {
   return this.property(name, Object, schema);
 };
 
+Resource.object = function (name, schema) {
+  return this.property(name, Object, schema);
+}
+
 Resource.property = function (name, typeOrSchema, schema) {
   var definer = {};
   var type = (function () {
@@ -545,6 +561,37 @@ Resource.timestamps = function () {
 Resource.define = function (schema) {
   return resourceful.mixin(this.schema, schema);
 };
+
+function cloningMixin(target) {
+  var objs = Array.prototype.slice.call(arguments, 1);
+  objs.forEach(function (o) {
+    Object.keys(o).forEach(function (k) {
+      if (!o.__lookupGetter__(k)) {
+        target[k] = Object.create(o[k]);
+      }
+    });
+  });
+  return target;
+}
+
+Resource.mixin = function(resourcez) {
+  var target = this;
+  var objs = Array.prototype.slice.call(arguments, 0);
+  objs.forEach(function (resource) {
+    if (typeof resource === "string") {
+      resource = resourceful.resources[common.capitalize(resource)];
+      if (!resource) {
+        throw new(TypeError)("argument must be a valid resource name");
+      }
+    } else if (resource.__proto__ !== resourceful.Resource) {
+      console.log(resource);
+      throw new Error("Can't mixin a non-Resource");
+    }
+
+    target.schema.properties = cloningMixin(target.schema.properties, resource.schema.properties);
+  });
+  return this;
+}
 
 //
 // Synchronize a Resource's design document with the database.
@@ -623,6 +670,12 @@ Resource.prototype.reload = function (callback) {
   return this.constructor.get(this._id, callback);
 };
 
+<<<<<<< HEAD
+Resource.prototype.destroy = function () {};
+Resource.prototype.truncate = function () {};
+Resource.prototype.reload = function () {};
+=======
+>>>>>>> upstream/master
 Resource.prototype.readProperty = function (k, getter) {
   return getter ? getter.call(this, this._properties[k]) : this._properties[k];
 };

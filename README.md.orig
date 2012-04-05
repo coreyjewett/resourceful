@@ -95,13 +95,13 @@ Creature.prototype.feed = function (food) {
 Now lets instantiate a Creature, and feed it:
 
 ``` js
-var wolf = new(Creature)({
-  diet:      'carnivore',
-  vertebrate: true
-});
-
-wolf.feed('squirrel');
-console.dir(wolf.belly);
+  var wolf = new(Creature)({
+    diet:      'carnivore',
+    vertebrate: true
+  });
+  
+  wolf.feed('squirrel');
+  console.dir(wolf.belly);
 ```
 
 You can also define resources this way:

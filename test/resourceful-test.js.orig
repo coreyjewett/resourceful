@@ -15,6 +15,7 @@ vows.describe('resourceful').addVows({
         assert.isFunction(Factory.create);
         assert.isFunction(Factory.new);
         assert.isFunction(Factory.destroy);
+        assert.isFunction(Factory.truncate);
         assert.isFunction(Factory.get);
         assert.isFunction(Factory.all);
         assert.isFunction(Factory.find);
@@ -387,6 +388,17 @@ vows.describe('resourceful').addVows({
       },
       "should be type:'number'": function (r) {
         assert.equal(r.properties.rank.type, "number");
+      },
+      "default": {
+        topic: function () {
+          var r = resourceful.define();
+          r.number('rank', { minimum: 1, default: 5 });
+          return r;
+        },
+        "should have": function (r) {
+          assert.equal(r.properties.rank.default, 5);
+          assert.equal(new(r)().rank, 5);
+        }
       }
     },
     "with `bool()`": {
@@ -484,6 +496,214 @@ vows.describe('resourceful').addVows({
         assert.equal(r.properties.title.type, "string");
         assert.equal(r.properties.title.maxLength, 16);
         assert.equal(r.properties.title.minLength, 0);
+      }
+    }
+  }
+}).addVows({ // CRUD
+  "Data queries": {
+    "on the Resource factory": {
+      "with default Resources": {
+        topic: function () {
+          new(resourceful.engines.Memory)({uri: 'data-queries'}).load({
+            bob: { _id: 42, age: 35, hair: 'black'},
+            tim: { _id: 43, age: 16, hair: 'brown'},
+            mat: { _id: 44, age: 29, hair: 'black'}
+          });
+          return resourceful.define('poop').connect('memory://data-queries');
+        },
+        "a get() request": {
+          "when successful": {
+            topic: function (r) {
+              this.Factory = r;
+              r.get("bob", this.callback);
+            },
+            "should respond with a Resource instance": function (e, obj) {
+              assert.isObject(obj);
+              assert.instanceOf(obj, resourceful.Resource);
+              assert.equal(obj.constructor, this.Factory);
+            },
+            "should respond with the right object": function (e, obj) {
+              assert.equal(obj._id, 42);
+            }
+          },
+          "when unsuccessful": {
+            topic: function (r) {
+              r.get("david", this.callback);
+            },
+            "should respond with an error": function (e, obj) {
+              assert.equal(e.status, 404);
+              assert.isUndefined(obj);
+            }
+          }
+        },
+        "a find() request": {
+          "when successful": {
+            topic: function (r) {
+              r.find({ hair: "black" }, this.callback);
+            },
+            "should respond with an array of length 2": function (e, obj) {
+              assert.equal(obj.length, 2);
+            },
+            "should respond with an array of Resource instances": function (e, obj) {
+              assert.isArray(obj);
+              assert.instanceOf(obj[0], resourceful.Resource);
+              assert.instanceOf(obj[1], resourceful.Resource);
+            }
+          },
+          "when unsuccessful": {
+            topic: function (r) { r.find({ hair: "blue" }, this.callback); },
+            "should respond with an empty array": function (e, obj) {
+              assert.isArray(obj);
+              assert.equal(obj.length, 0);
+            }
+          }
+        },
+        "an all() request": {
+          topic: function (r) {
+            r.all(this.callback);
+          },
+          "should respond with an array of all records": function (e, obj) {
+            assert.isArray(obj);
+            assert.equal(obj.length, 3);
+          }
+        },
+        "a create() request": {
+          topic: function (r) {
+            this.Factory = r;
+            r.create({ _id: '99', age: 30, hair: 'red'}, this.callback);
+          },
+          "should return the newly created object": function (e, obj) {
+            assert.isNull(e);
+            assert.strictEqual(obj.constructor,this.Factory);
+            assert.instanceOf(obj,this.Factory);
+            assert.equal(obj.id,99);
+          },
+          "should create the record in the db": function (e, res) {
+            assert.isObject(this.Factory.connection.store['99']);
+            assert.equal(this.Factory.connection.store['99'].age, 30);
+          }
+        }
+      },
+      "with user Resources": {
+        topic: function () {
+          resourceful.resources.Article = resourceful.define('article');
+          var connection = new(resourceful.engines.Memory)('articles').load({
+            42: { _id: 42, title: 'on flasks', resource: 'Article'},
+            43: { _id: 43, title: 'on eras',   resource: 'Article'},
+            44: { _id: 44, title: 'on people', resource: 'Article'}
+          });
+          resourceful.resources.Article.connection = connection;
+          return resourceful.resources.Article;
+        },
+        "a get() request": {
+          topic: function (r) {
+            r.get(42, this.callback);
+          },
+          "should respond with an Article instance": function (e, obj) {
+            assert.isObject(obj);
+            assert.instanceOf(obj, resourceful.resources.Article);
+            assert.equal(obj.constructor, resourceful.resources.Article);
+            assert.equal(obj.resource, 'Article');
+          },
+          "should respond with the right object": function (e, obj) {
+            assert.equal(obj._id, 42);
+          }
+        }
+      },
+      "with heterogenous data": {
+        topic: function () {
+          resourceful.resources.Article = resourceful.define('article');
+          var connection = new(resourceful.engines.Memory)('heterogenous').load({
+            42:  { _id: 42, title: 'on flasks', resource: 'Article'},
+            bob: { _id: 42, age: 35, hair: 'black'},
+            tim: { _id: 43, age: 16, hair: 'brown'},
+            44:  { _id: 44, title: 'on people', resource: 'Article'}
+          });
+
+          resourceful.resources.Article.connection = connection;
+          return resourceful.resources.Article;
+        },
+        "an all() request": {
+          topic: function (r) {
+            this.Factory = r;
+            r.all(this.callback);
+          },
+          "should respond with a mix of Resource and Article instances": function (e, obj) {
+            assert.equal(obj[0].constructor, resourceful.resources.Article);
+            assert.equal(obj[1].constructor, resourceful.resources.Article);
+            assert.equal(obj[2].constructor, this.Factory);
+            assert.equal(obj[3].constructor, this.Factory);
+          }
+        }
+      }
+    },
+    "on a Resource instance": {
+      "with a default resource": {
+        topic: function () {
+          var conn = this.connection = new(resourceful.engines.Memory)();
+          this.Resource = resourceful.define(function () {
+            this.connection = conn;
+          });
+          return new(this.Resource)({ _id: '42', name: "bob" });
+        },
+        "the `isNewRecord` flag should be true": function (r) {
+          assert.strictEqual(r.isNewRecord, true);
+        },
+        "a save() query": {
+          topic: function (r) {
+            this.r = r;
+            r.save(this.callback);
+          },
+          "should save the document in the store": function (res) {
+            assert.include(this.Resource._connection.store, '42');
+            assert.equal(this.Resource._connection.store[42].name, "bob");
+          },
+          "should set the `resource` attribute accordingly": function (res) {
+            assert.equal(this.Resource._connection.store[42].resource,
+                         this.Resource._resource);
+          },
+          "should set the `isNewRecord` flag to false": function () {
+            assert.strictEqual(this.r.isNewRecord, false);
+          },
+          "and an update query": {
+            topic: function (_, r) {
+              r.update({ name: "bobby" }, this.callback);
+            },
+            "should update the document": function (res) {
+              assert.equal(this.Resource._connection.store[42].name, "bobby");
+            }
+          }
+        }
+      },
+      "with a user resource": {
+        topic: function () {
+          var conn = this.connection = new(resourceful.engines.Memory)();
+          this.User = resourceful.define('user', function () {
+            this.connection = conn;
+          });
+          return new(this.User)({ _id: '55', name: "fab" });
+        },
+        "a save() query": {
+          topic: function (r) {
+            this.r = r;
+            r.save(this.callback);
+          },
+          "should save the document in the store": function (res) {
+            assert.include(this.User._connection.store, '55');
+            assert.equal(this.User._connection.store[55].name, "fab");
+          },
+          "should set the `resource` attribute accordingly": function (res) {
+            assert.equal(this.User._connection.store[55].resource, "User");
+          },
+          "and an update query": {
+            topic: function (_, r) {
+              r.update({ name: "bobby" }, this.callback);
+            },
+            "should update the document": function (res) {
+              assert.equal(this.User._connection.store[55].name, "bobby");
+            }
+          }
+        }
       }
     }
   }
