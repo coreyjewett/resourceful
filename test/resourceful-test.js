@@ -1,10 +1,5 @@
-var path = require('path'),
-    assert = require('assert'),
-    events = require('events'),
-    http = require('http'),
-    fs = require('fs'),
+var assert = require('assert'),
     vows = require('vows'),
-    cradle = require('cradle'),
     resourceful = require('../lib/resourceful');
 
 vows.describe('resourceful').addVows({
@@ -18,15 +13,18 @@ vows.describe('resourceful').addVows({
       },
       "and has the create/get/all/find methods": function (Factory) {
         assert.isFunction(Factory.create);
+        assert.isFunction(Factory.new);
         assert.isFunction(Factory.destroy);
         assert.isFunction(Factory.truncate);
         assert.isFunction(Factory.get);
         assert.isFunction(Factory.all);
         assert.isFunction(Factory.find);
+        assert.isFunction(Factory.save);
+        assert.isFunction(Factory.update);
       },
       "which can be called": {
         topic: function (Factory) {
-          return new(Factory);
+          return new(Factory)();
         },
         "to return Resource instances which have prototype methods": function (resource) {
           assert.isFunction(resource.save);
@@ -54,7 +52,7 @@ vows.describe('resourceful').addVows({
         topic: function (Article) {
           this.constructor = Article;
           Article.prototype.data = 41;
-          return new(Article);
+          return new(Article)();
         },
         "returning Article instances": function (article) {
           assert.isObject(article);
@@ -65,6 +63,7 @@ vows.describe('resourceful').addVows({
           assert.isFunction(article.save);
           assert.isFunction(article.update);
           assert.isFunction(article.destroy);
+          assert.isFunction(article.reload);
         },
         "and doesn't have a value for `id` and `key`": function (article) {
           assert.isUndefined(article.id);
@@ -86,6 +85,7 @@ vows.describe('resourceful').addVows({
       assert.isFunction(r.bool);
       assert.isFunction(r.array);
       assert.isFunction(r.number);
+      assert.isFunction(r.object);
     },
     "resource should be set to 'Resource'": function (r) {
       assert.match(r.resource, /^Resource\d+/);
@@ -104,7 +104,7 @@ vows.describe('resourceful').addVows({
   "A Resource with a couple of properties": {
     topic: function () {
       var r = resourceful.define('book');
-      r.property('title');
+      r.property('title').restricted();
       r.property('kind');
       return r;
     },
@@ -122,6 +122,13 @@ vows.describe('resourceful').addVows({
       },
       "should respond to toJSON()": function (r) {
         assert.isObject(r.toJSON());
+      },
+      "should respond to restricted() with filtered properties": function (r) {
+        var restricted = r.restricted();
+        assert.isObject(restricted);
+
+        assert.ok(restricted.title);
+        assert.ok(!restricted.kind);
       },
       "should return the attributes, when `Object.keys` is called": function (r) {
         var keys = Object.keys(r);
@@ -146,7 +153,7 @@ vows.describe('resourceful').addVows({
     },
     "only keeps the last copy": function (r) {
       assert.equal(Object.keys(r.properties).length, 2); // 'dup' & 'id'
-    },
+    }
   },
   "A Resource with sanitized _id": {
     topic: function () {
@@ -161,7 +168,7 @@ vows.describe('resourceful').addVows({
         this.r.get('aBc', this.callback);
       },
       "and be found by non-sanitized_id": function (r) {
-        console.error(r);
+        assert.equal(r.toString(), '{"_id":"abc","resource":"Resource3"}');
       }
     }
   },
@@ -175,48 +182,48 @@ vows.describe('resourceful').addVows({
       "type": function (p) {
         p.type('integer');
         assert.equal(p.property.type, "integer");
-        assert.throws(function () { p.type('unknwon') }, TypeError);
+        assert.throws(function () { p.type('unknwon'); }, TypeError);
       },
       "required": function (p) {
         p.required(true);
         assert.equal(p.property.required, true);
-        assert.throws(function () { p.required(1) }, TypeError);
+        assert.throws(function () { p.required(1); }, TypeError);
       },
       "unique": function (p) {
         p.unique(true);
         assert.equal(p.property.unique, true);
-        assert.throws(function () { p.unique(1) }, TypeError);
+        assert.throws(function () { p.unique(1); }, TypeError);
       },
       "title": function (p) {
         p.title("the title");
         assert.equal(p.property.title, "the title");
-        assert.throws(function () { p.title(false) }, TypeError);
+        assert.throws(function () { p.title(false); }, TypeError);
       },
       "description": function (p) {
         p.description("the description");
         assert.equal(p.property.description, "the description");
-        assert.throws(function () { p.title(false) }, TypeError);
+        assert.throws(function () { p.title(false); }, TypeError);
       },
       "format": function (p) {
         p.format("email");
         assert.equal(p.property.format, "email");
-        assert.throws(function () { p.format("unknown") }, Error);
+        assert.throws(function () { p.format("unknown"); }, Error);
       },
       "storageName": function (p) {
         p.storageName("_kind");
         assert.equal(p.property.storageName, "_kind");
-        assert.throws(function () { p.storageName(21) }, TypeError);
+        assert.throws(function () { p.storageName(21); }, TypeError);
       },
       "conform": function (p) {
-        p.conform(function (kind) { kind !== "banana" });
+        p.conform(function (kind) { return kind !== "banana"; });
         assert.isFunction(p.property.conform);
-        assert.throws(function () { p.conform("banana") }, TypeError);
+        assert.throws(function () { p.conform("banana"); }, TypeError);
       },
       "lazy": function (p) {
         p.lazy(true);
         assert.equal(p.property.lazy, true);
-        assert.throws(function () { p.lazy(1) }, TypeError);
-      },
+        assert.throws(function () { p.lazy(1); }, TypeError);
+      }
     },
     "with a 'string' type": {
       topic: function () {
@@ -230,7 +237,7 @@ vows.describe('resourceful').addVows({
         "length": function (p) {},
         "sanitize('upper')": {
           topic: function (p) {
-            p.sanitize('upper');
+            p.sanitize('reset').sanitize('upper');
             return new this.Resource({kind: 'test'});
           },
           "and pass check": function (instance) {
@@ -239,7 +246,7 @@ vows.describe('resourceful').addVows({
         },
         "sanitize('lower')": {
           topic: function (p) {
-            p.sanitize('lower');
+            p.sanitize('reset').sanitize('lower');
             return new this.Resource({kind: 'TEST'});
           },
           "and pass check": function (instance) {
@@ -248,7 +255,7 @@ vows.describe('resourceful').addVows({
         },
         "sanitize('capitalize')": {
           topic: function (p) {
-            p.sanitize('capitalize');
+            p.sanitize('reset').sanitize('capitalize');
             return new this.Resource({kind: 'mexico'});
           },
           "and pass check": function (instance) {
@@ -257,22 +264,33 @@ vows.describe('resourceful').addVows({
         },
         "sanitize('pluralize')": {
           topic: function (p) {
-            p.sanitize('pluralize');
+            p.sanitize('reset').sanitize('pluralize');
             return new this.Resource({kind: 'test'});
           },
           "and pass check": function (instance) {
             assert.equal(instance.kind, 'tests');
           }
         },
+        "sanitize('upper').sanitize('replace')": {
+          topic: function (p) {
+            p.sanitize('reset')
+             .sanitize('upper')
+             .sanitize('replace', /[^a-z]+/ig, '-');
+            return new this.Resource({kind: 'hello world'});
+          },
+          "and pass check": function (instance) {
+            assert.equal(instance.kind, 'HELLO-WORLD');
+          }
+        },
         "sanitize('replace')": {
           topic: function (p) {
-            p.sanitize('replace', /[^a-z]+/g, '-');
+            p.sanitize('reset').sanitize('replace', /[^a-z]+/g, '-');
             return new this.Resource({kind: 'hello world'});
           },
           "and pass check": function (instance) {
             assert.equal(instance.kind, 'hello-world');
           }
-        },
+        }
       }
     },
     "with a 'number' type": {
@@ -286,7 +304,7 @@ vows.describe('resourceful').addVows({
         "within": function (p) {},
         "sanitize('round')": {
           topic: function (p) {
-            p.sanitize('round');
+            p.sanitize('reset').sanitize('round');
             return new this.Resource({size: 10.5});
           },
           "and pass check": function (instance) {
@@ -295,7 +313,7 @@ vows.describe('resourceful').addVows({
         },
         "sanitize(function () {...})": {
           topic: function (p) {
-            p.sanitize(function (x) { return x * x; });
+            p.sanitize('reset').sanitize(function (x) { return x * x; });
             return new this.Resource({size: 3});
           },
           "and pass check": function (instance) {
@@ -310,7 +328,7 @@ vows.describe('resourceful').addVows({
               assert.equal(size, 900);
             }
           }
-        },
+        }
       },
       "return an object which doesn't implement String 'definers'": function (p) {
         assert.isUndefined(p.pattern);
@@ -334,6 +352,16 @@ vows.describe('resourceful').addVows({
       "should default to type:'string'": function (r) {
         assert.equal(r.properties.title.type, "string");
         assert.equal(r.properties.description.type, "string");
+      }
+    },
+    "with `object()`": {
+      topic: function () {
+        var r = resourceful.define();
+        r.object('title');
+        return r;
+      },
+      "should be type:'object'": function (r) {
+        assert.equal(r.properties.title.type, "object");
       }
     },
     "with `string()`": {
@@ -469,115 +497,6 @@ vows.describe('resourceful').addVows({
         assert.equal(r.properties.title.maxLength, 16);
         assert.equal(r.properties.title.minLength, 0);
       }
-    }
-  }
-}).addVows({ // Mixins
-  "mixin()": {
-    topic: function () {
-      var mA = resourceful.define("mixinA");
-      mA.string("propA");
-      mA.number("propB");
-      var mB = resourceful.define("mixinB");
-      mB.string("propC")
-          .maxLength(16)
-          .minLength(0);
-      mB.number("propD");
-      var mC = resourceful.define("mixinC");
-      mC.bool("propA");   // collision.
-      mC.number("propE");
-      return [mA, mB, mC];
-    },
-    "does basic composition": function (mixins) {
-      var r = resourceful.define("shaken");
-      r.string("propZ");
-      r.mixin(mixins[0]);
-      r.mixin(mixins[1]);
-
-      // assert.equal(Object.keys(r.properties).length, 6);
-      assert.equal(r.properties.propZ.type, "string");
-      assert.equal(r.properties.propA.type, "string");
-      assert.equal(r.properties.propB.type, "number");
-      assert.equal(r.properties.propC.type, "string");
-      assert.equal(r.properties.propC.maxLength, 16);
-      assert.equal(r.properties.propC.minLength, 0);
-      assert.equal(r.properties.propD.type, "number");
-      assert.equal(r.properties.propA.maxLength, undefined);
-    },
-    "last property overwrites in the event of collision": function (mixins) {
-      var r = resourceful.define("stirred");
-      r.array("propA");
-      assert.equal(Object.keys(r.properties).length, 2);    // includes _id
-      assert.equal(r.properties.propA.type, "array");
-
-      r.mixin(mixins[0]);
-      assert.equal(Object.keys(r.properties).length, 3);
-      assert.equal(r.properties.propA.type, "string");
-
-      r.mixin(mixins[2]);
-      assert.equal(Object.keys(r.properties).length, 4);
-      assert.equal(r.properties.propA.type, "boolean");
-      assert.equal(r.properties.propB.type, "number");
-      assert.equal(r.properties.propE.type, "number");
-    },
-    "accepts String resource name as mixin": function(mixins) {
-      var r = resourceful.define("blended");
-      r.array("propA");
-      assert.equal(Object.keys(r.properties).length, 2);
-      assert.equal(r.properties.propA.type, "array");
-
-      r.mixin(mixins[0]);
-      assert.equal(Object.keys(r.properties).length, 3);
-      assert.equal(r.properties.propA.type, "string");
-    },
-    "accepts multiple arguments": function(mixins) {
-      var r = resourceful.define("blended");
-      r.mixin.apply(r, mixins);
-      assert.equal(Object.keys(r.properties).length, 6);
-    },
-    "properties": {
-      "have validation methods": function(mixins) {
-        var r = resourceful.define("emulsified");
-        r.number("propZ").maximum = 8;
-        r.properties["propZ"].maximum = 12;
-        assert.equal(r.properties.propZ.type, "number");
-        assert.equal(r.properties.propZ.maximum, 12);
-
-        r.mixin("mixinA");
-        r.properties['propB'].maximum = 6;
-        assert.equal(r.properties.propB.type, "number");
-        assert.equal(r.properties.propB.maximum, 6);
-      },
-      "are copied not references": function(mixins) {
-        var r = resourceful.define("emulsified");
-        r.mixin(mixins[0]);
-        r.properties['propB'].maximum = 6 ;
-        assert.equal(r.properties.propB.maximum, 6);
-        assert.equal(mixins[0].properties.propB.maximum, undefined);
-      }
-    },
-    "summary": function() {
-      var Creature = resourceful.define('creature', function () {
-         this.string('diet');
-         this.bool('vertebrate');
-         this.array('belly');
-       });
-
-      var Invertebrate = resourceful.define('Invertebrate', function () {
-        this.mixin(Creature);
-        this.bool("vertebrate", {default: false});
-      });
-
-      var Insect = resourceful.define('Insect', function () {
-        this.mixin(Invertebrate);
-        this.number('legs').minimum(6).maximum(6).default(6);
-      });
-
-      var ladybug = new(Insect)({
-        diet:      'aphids'
-      });
-
-      assert.equal(ladybug.legs, 6);
-      assert.equal(ladybug.vertebrate, false);
     }
   }
 }).addVows({ // CRUD

@@ -5,13 +5,15 @@ var Creature = resourceful.define('creature', function () {
   this.bool('vertebrate');
   this.array('belly');
 
+  this.timestamps();
+
   this.prototype.feed = function (food) {
     this.belly.push(food);
   };
 });
 
 var wolf = new(Creature)({
-  diet:      'carnivor',
+  diet:      'carnivore',
   vertebrate: true
 });
 

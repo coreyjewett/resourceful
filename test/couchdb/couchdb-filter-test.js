@@ -1,20 +1,17 @@
-var path = require('path'),
-    assert = require('assert'),
+var assert = require('assert'),
     events = require('events'),
-    http = require('http'),
-    fs = require('fs'),
     cradle = require('cradle'),
     vows = require('vows'),
     resourceful = require('../../lib/resourceful');
 
-var numberOfArticles = 5, Article;
+var Article;
 
 resourceful.env = 'test';
 
 vows.describe('resourceful/resource/view').addVows({
   "A database containing articles and other resources": {
     topic: function () {
-      resourceful.use('couchdb', 'couchdb://localhost:5984/test');
+      resourceful.use('couchdb', 'couchdb://127.0.0.1:5984/test');
       var promise = new(events.EventEmitter);
       var db = new(cradle.Connection)().database('test');
       db.destroy(function () {
@@ -39,7 +36,7 @@ vows.describe('resourceful/resource/view').addVows({
   "A Resource definition with filters": {
     topic: function () {
       Article = resourceful.define('Article', function () {
-        this.use('couchdb', 'couchdb://localhost:5984/test');
+        this.use('couchdb', 'couchdb://127.0.0.1:5984/test');
         this.property('author');
         this.property('title');
         this.property('published', Boolean);
@@ -115,7 +112,7 @@ vows.describe('resourceful/resource/view').addVows({
   "A second Resource definition with filters": {
     topic: function () {
       return resourceful.define('Person', function () {
-        this.use('couchdb', 'couchdb://localhost:5984/test');
+        this.use('couchdb', 'couchdb://127.0.0.1:5984/test');
         this.property('name');
         this.property('position');
         this.property('age', Number);
